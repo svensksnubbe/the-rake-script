@@ -1,0 +1,143 @@
+-- the rake script gui by Sianrang98
+-- written by AI
+-- press T to close the gui
+-- if you see warnings, stop using teleport for like 30 seconds
+
+
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local workspace = game:GetService("Workspace")
+
+-- GUI Setup
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ScrapTPGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+-- Main Frame (draggable container)
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 250, 0, 100)
+mainFrame.Position = UDim2.new(0.5, -125, 0.8, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+-- Close Button
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -35, 0, 5)
+closeButton.Text = "X"
+closeButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+closeButton.TextColor3 = Color3.new(1, 1, 1)
+closeButton.Font = Enum.Font.SourceSansBold
+closeButton.TextSize = 20
+closeButton.Parent = mainFrame
+
+-- Teleport Button
+local teleportButton = Instance.new("TextButton")
+teleportButton.Size = UDim2.new(0, 200, 0, 40)
+teleportButton.Position = UDim2.new(0.5, -100, 0.5, -20)
+teleportButton.Text = "Teleport to Closest Scrap"
+teleportButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+teleportButton.TextColor3 = Color3.new(1, 1, 1)
+teleportButton.Font = Enum.Font.SourceSansBold
+teleportButton.TextSize = 20
+teleportButton.Parent = mainFrame
+
+-- Reopen GUI with keybind (T)
+game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.T then
+		mainFrame.Visible = not mainFrame.Visible
+	end
+end)
+
+-- Close button functionality
+closeButton.MouseButton1Click:Connect(function()
+	mainFrame.Visible = false
+end)
+
+-- Remove all previous highlights
+local function clearHighlights()
+	for _, h in ipairs(workspace:GetDescendants()) do
+		if h:IsA("Highlight") and h.Name == "ScrapHighlight" then
+			h:Destroy()
+		end
+	end
+end
+
+-- Add highlight to a part
+local function addHighlight(part, color, depthMode)
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "ScrapHighlight"
+	highlight.Adornee = part
+	highlight.FillColor = color
+	highlight.FillTransparency = 0.7
+	highlight.OutlineColor = color
+	highlight.OutlineTransparency = 0.2
+	highlight.DepthMode = depthMode or Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Parent = part
+end
+
+-- Get nested Scrap parts
+local function getAllScrapParts()
+	local scraps = {}
+	local scrapSpawns = workspace:WaitForChild("Filter"):WaitForChild("ScrapSpawns")
+
+	for _, itemSpawn in ipairs(scrapSpawns:GetChildren()) do
+		for _, scrapContainer in ipairs(itemSpawn:GetChildren()) do
+			local scrapPart = scrapContainer:FindFirstChild("Scrap")
+			if scrapPart and scrapPart:IsA("BasePart") then
+				table.insert(scraps, scrapPart)
+			end
+		end
+	end
+
+	return scraps
+end
+
+-- Find closest scrap
+local function getClosestScrap(scraps, playerPosition)
+	local closestScrap = nil
+	local shortestDistance = math.huge
+
+	for _, scrap in ipairs(scraps) do
+		local distance = (scrap.Position - playerPosition).Magnitude
+		if distance < shortestDistance then
+			shortestDistance = distance
+			closestScrap = scrap
+		end
+	end
+
+	return closestScrap
+end
+
+-- Teleport logic
+teleportButton.MouseButton1Click:Connect(function()
+	local scraps = getAllScrapParts()
+	clearHighlights()
+
+	if #scraps == 0 then
+		warn("No scraps found.")
+		return
+	end
+
+	local character = player.Character or player.CharacterAdded:Wait()
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	local closestScrap = getClosestScrap(scraps, hrp.Position)
+
+	-- Add highlights to all scraps
+	for _, scrap in ipairs(scraps) do
+		local color = (scrap == closestScrap) and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(0, 170, 255)
+		addHighlight(scrap, color)
+	end
+
+	-- Teleport to closest scrap
+	if closestScrap then
+		hrp.CFrame = closestScrap.CFrame + Vector3.new(0, 5, 0)
+	end
+end)
